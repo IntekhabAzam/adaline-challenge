@@ -1,35 +1,17 @@
-import { useState, useMemo, useCallback } from "react";
 import { Workspace } from "./components/Workspace";
-import { useWebSocket } from "./hooks/useWebSocket";
-import { FolderType, ItemType, WorkspaceData } from "./types";
+import { FolderType, ItemType } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { DragEndEvent } from "@dnd-kit/core";
 import { EmptyState } from "./components/EmptyState";
+import { useWorkspaceConnection } from "./hooks/useWorkspaceConnection";
+import { useElementNumbring } from "./hooks/useElementNumbring";
 
 function App() {
-  const [interactionData, setInteractionData] = useState<WorkspaceData>({
-    elements: [],
-  });
-  const [isConnected, setIsConnected] = useState(false);
-  const { sendMessage } = useWebSocket("ws://localhost:8080", {
-    onMessage: (message) => {
-      const { type, data } = JSON.parse(message.data);
-      if (type === "initial" || type === "update") {
-        setInteractionData(data);
-      }
-    },
-    onOpen: () => setIsConnected(true),
-    onClose: () => setIsConnected(false),
-  });
-
-  // Update server when local data changes
-  const updateData = useCallback(
-    (elements: (ItemType | FolderType)[]) => {
-      const updatedData = { elements };
-      setInteractionData(updatedData);
-      sendMessage({ type: "update", data: updatedData });
-    },
-    [sendMessage]
+  const { isConnected, interactionData, updateData } = useWorkspaceConnection(
+    "ws://localhost:8080"
+  );
+  const { nextItemNumber, nextFolderNumber } = useElementNumbring(
+    interactionData.elements
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -62,22 +44,18 @@ function App() {
 
       // Prevent all folder nesting scenarios
       if (activeElement.type === "folder") {
-        // If dragging a folder onto another folder, just reorder them
         if (overElement.type === "folder") {
           const [movedFolder] = updatedElements.splice(activeIndex, 1);
           updatedElements.splice(overIndex, 0, movedFolder);
           updateData(updatedElements);
           return;
         }
-        // If dragging a folder onto an item, keep folder at root level
         activeElement.parentId = null;
       } else {
-        // Items can be placed in folders or reordered
         activeElement.parentId =
           overElement.type === "folder" ? overElement.id : overElement.parentId;
       }
 
-      // Reorder elements
       updatedElements.splice(activeIndex, 1);
       updatedElements.splice(overIndex, 0, activeElement);
     }
@@ -94,17 +72,6 @@ function App() {
       )
     );
   };
-
-  const { nextItemNumber, nextFolderNumber } = useMemo(() => {
-    const items = interactionData.elements.filter((el) => el.type === "item");
-    const folders = interactionData.elements.filter(
-      (el) => el.type === "folder"
-    );
-    return {
-      nextItemNumber: items.length + 1,
-      nextFolderNumber: folders.length + 1,
-    };
-  }, [interactionData.elements]);
 
   const handleAddItem = () => {
     const newItem: ItemType = {
