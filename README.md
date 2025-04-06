@@ -1,12 +1,8 @@
 # Adaline Challenge
 
----
-
 ## Prerequisites
 - Node.js (v18 or later)
 - npm (v9 or later)
-
----
 
 ## Installation
 
@@ -22,6 +18,8 @@
 3. Start the frontend server:
    ```bash
    npm run dev
+
+---
 
 ### Server Setup
 1. Navigate to the Server folder:
